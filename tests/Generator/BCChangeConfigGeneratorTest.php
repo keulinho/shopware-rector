@@ -5,7 +5,14 @@ declare(strict_types=1);
 namespace Frosh\Rector\Tests\Generator;
 
 use Frosh\Rector\Generator\BCChangeConfigGenerator;
-use Frosh\Rector\Rule\BCChange\BCChangeRector;
+use Frosh\Rector\Rule\BCChange\BCChangeConfiguration;
+use Frosh\Rector\Rule\BCChange\ValueObject\AddOptionalParameter;
+use Frosh\Rector\Rule\BCChange\ValueObject\AddRequiredParameter;
+use Frosh\Rector\Rule\BCChange\ValueObject\ChangeParameterDefault;
+use Frosh\Rector\Rule\BCChange\ValueObject\ChangeParameterName;
+use Frosh\Rector\Rule\BCChange\ValueObject\ChangeParameterType;
+use Frosh\Rector\Rule\BCChange\ValueObject\ChangeReturnType;
+use Frosh\Rector\Rule\BCChange\ValueObject\RemoveParameter;
 use Frosh\Rector\Tests\Generator\Fixture\BCChangeFixture;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -18,95 +25,37 @@ final class BCChangeConfigGeneratorTest extends TestCase
     {
         $changes = (new BCChangeConfigGenerator(__NAMESPACE__ . '\Fixture\BCChange\\'))->collect([BCChangeFixture::class], 'v6.8.0');
 
-        self::assertSame([
-            [
-                'version' => 'v6.8.0',
-                'class' => BCChangeFixture::class,
-                'method' => 'changeDefault',
-                'kind' => BCChangeRector::EXPLICIT_CURRENT_DEFAULT,
-                'position' => 0,
-                'parameter' => 'enabled',
-                'default' => false,
-            ],
-            [
-                'version' => 'v6.8.0',
-                'class' => BCChangeFixture::class,
-                'method' => 'load',
-                'kind' => BCChangeRector::ADD_OPTIONAL_PARAMETER,
-                'position' => 1,
-                'parameter' => 'fresh',
-                'type' => 'bool',
-                'default' => false,
-            ],
-            [
-                'version' => 'v6.8.0',
-                'class' => BCChangeFixture::class,
-                'method' => 'load',
-                'kind' => BCChangeRector::NARROW_RETURN_TYPE,
-                'currentType' => 'object',
-                'type' => 'static',
-            ],
-            [
-                'version' => 'v6.8.0',
-                'class' => BCChangeFixture::class,
-                'method' => 'load',
-                'kind' => BCChangeRector::WIDEN_PARAMETER_TYPE,
-                'parameter' => 'id',
-                'currentType' => 'string',
-                'type' => 'int|string',
-            ],
-            [
-                'version' => 'v6.8.0',
-                'class' => BCChangeFixture::class,
-                'method' => 'remove',
-                'kind' => BCChangeRector::REMOVE_PARAMETER,
-                'position' => 1,
-                'parameter' => 'obsolete',
-            ],
-            [
-                'version' => 'v6.8.0',
-                'class' => BCChangeFixture::class,
-                'method' => 'rename',
-                'kind' => BCChangeRector::RENAME_PARAMETER,
-                'position' => 2,
-                'parameter' => 'third',
-                'newName' => 'renamed',
-                'parametersBefore' => [
-                    [
-                        'name' => 'required',
-                        'hasDefault' => false,
-                    ],
-                    [
-                        'name' => 'optional',
-                        'hasDefault' => true,
-                        'default' => false,
-                    ],
-                ],
-            ],
-            [
-                'version' => 'v6.8.0',
-                'class' => BCChangeFixture::class,
-                'method' => 'requireParameter',
-                'kind' => BCChangeRector::ADD_REQUIRED_PARAMETER,
-                'position' => 1,
-                'parameter' => 'context',
-                'type' => 'object',
-            ],
+        self::assertEquals([
+            new ChangeParameterDefault('v6.8.0', BCChangeFixture::class, 'changeDefault', 0, 'enabled', false),
+            new AddOptionalParameter('v6.8.0', BCChangeFixture::class, 'load', 1, 'fresh', 'bool', false),
+            new ChangeParameterType('v6.8.0', BCChangeFixture::class, 'load', 'id', 'string', 'int|string'),
+            new ChangeReturnType('v6.8.0', BCChangeFixture::class, 'load', 'object', 'static'),
+            new RemoveParameter('v6.8.0', BCChangeFixture::class, 'remove', 1, 'obsolete'),
+            new ChangeParameterName('v6.8.0', BCChangeFixture::class, 'rename', 2, 'third', 'renamed', [
+                ['name' => 'required', 'hasDefault' => false],
+                ['name' => 'optional', 'hasDefault' => true, 'default' => false],
+            ]),
+            new AddRequiredParameter('v6.8.0', BCChangeFixture::class, 'requireParameter', 1, 'context', 'object'),
         ], $changes);
     }
 
     public function testReplacesOnlyTheGeneratedVersion(): void
     {
         $generator = new BCChangeConfigGenerator();
+        $old = new RemoveParameter('v6.7.0', 'Example', 'run', 0, 'old');
+        $stale = new RemoveParameter('v6.8.0', 'Example', 'run', 0, 'stale');
+        $replacement = new RemoveParameter('v6.8.0', 'Example', 'run', 0, 'replacement');
 
-        self::assertSame([
-            ['version' => 'v6.7.0', 'class' => 'Example', 'method' => 'run', 'kind' => 'old'],
-            ['version' => 'v6.8.0', 'class' => 'Example', 'method' => 'run', 'kind' => 'replacement'],
-        ], $generator->replaceVersion([
-            ['version' => 'v6.7.0', 'class' => 'Example', 'method' => 'run', 'kind' => 'old'],
-            ['version' => 'v6.8.0', 'class' => 'Example', 'method' => 'run', 'kind' => 'stale'],
-        ], [
-            ['version' => 'v6.8.0', 'class' => 'Example', 'method' => 'run', 'kind' => 'replacement'],
-        ], 'v6.8.0'));
+        self::assertEquals([$old, $replacement], $generator->replaceVersion([$old, $stale], [$replacement], 'v6.8.0'));
+    }
+
+    public function testRendersTypedConfiguration(): void
+    {
+        $configuration = (new BCChangeConfigGenerator())->render([
+            new RemoveParameter('v6.8.0', 'Example', 'run', 0, 'obsolete'),
+        ]);
+
+        self::assertStringContainsString('return new ' . BCChangeConfiguration::class . '(', $configuration);
+        self::assertStringContainsString('new ' . RemoveParameter::class . '(', $configuration);
     }
 }

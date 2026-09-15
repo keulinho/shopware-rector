@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Frosh\Rector\Rule\BCChange;
 
 use Frosh\Rector\Version\ShopwareVersionRange;
+use Frosh\Rector\Rule\BCChange\ValueObject\BCChangeRuleConfiguration;
+use Frosh\Rector\Rule\BCChange\ValueObject\BCChange;
 use PhpParser\BuilderHelpers;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
@@ -24,7 +26,9 @@ use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\UnaryMinus;
 use PhpParser\Node\Expr\UnaryPlus;
 use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\ComplexType;
 use PhpParser\Node\Identifier;
+use PhpParser\Node\Name;
 use PhpParser\Node\Param;
 use PhpParser\Node\Scalar;
 use PhpParser\Node\Scalar\Int_;
@@ -39,15 +43,15 @@ use Rector\Rector\AbstractRector;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\ConfiguredCodeSample;
 use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
-final class BCChangeRector extends AbstractRector implements ConfigurableRectorInterface
+abstract class AbstractBCChangeRector extends AbstractRector implements ConfigurableRectorInterface
 {
-    public const ADD_OPTIONAL_PARAMETER = 'add_optional_parameter';
-    public const ADD_REQUIRED_PARAMETER = 'add_required_parameter';
-    public const WIDEN_PARAMETER_TYPE = 'widen_parameter_type';
-    public const NARROW_RETURN_TYPE = 'narrow_return_type';
-    public const EXPLICIT_CURRENT_DEFAULT = 'explicit_current_default';
-    public const RENAME_PARAMETER = 'rename_parameter';
-    public const REMOVE_PARAMETER = 'remove_parameter';
+    protected const ADD_OPTIONAL_PARAMETER = 'add_optional_parameter';
+    protected const ADD_REQUIRED_PARAMETER = 'add_required_parameter';
+    protected const WIDEN_PARAMETER_TYPE = 'widen_parameter_type';
+    protected const NARROW_RETURN_TYPE = 'narrow_return_type';
+    protected const EXPLICIT_CURRENT_DEFAULT = 'explicit_current_default';
+    protected const RENAME_PARAMETER = 'rename_parameter';
+    protected const REMOVE_PARAMETER = 'remove_parameter';
 
     /** @var list<array<string, mixed>> */
     private array $changes = [];
@@ -83,20 +87,24 @@ final class BCChangeRector extends AbstractRector implements ConfigurableRectorI
         return $this->refactorCall($node);
     }
 
-    /**
-     * @param array{
-     *     minimumVersion: string,
-     *     targetVersion: string,
-     *     changes: list<array<string, mixed>>
-     * } $configuration
-     */
     public function configure(array $configuration): void
     {
-        $this->versions = new ShopwareVersionRange($configuration['minimumVersion'], $configuration['targetVersion']);
+        $ruleConfiguration = $configuration[0] ?? null;
+        if (!$ruleConfiguration instanceof BCChangeRuleConfiguration || count($configuration) !== 1) {
+            throw new \LogicException(sprintf('%s expects exactly one %s instance.', static::class, BCChangeRuleConfiguration::class));
+        }
+
+        $this->versions = $ruleConfiguration->versions;
         $this->changes = [];
 
-        foreach ($configuration['changes'] as $change) {
-            $changeVersion = ltrim((string) $change['version'], 'v');
+        foreach ($ruleConfiguration->changes as $changeConfiguration) {
+            $configurationType = $this->configurationType();
+            if (!$changeConfiguration instanceof $configurationType) {
+                throw new \LogicException(sprintf('%s only accepts %s instances.', static::class, $configurationType));
+            }
+
+            $change = ['kind' => $this->supportedKind()] + $changeConfiguration->configuration();
+            $changeVersion = ltrim($changeConfiguration->version(), 'v');
             if (!$this->versions->targetIsAtLeast($changeVersion)) {
                 continue;
             }
@@ -104,6 +112,11 @@ final class BCChangeRector extends AbstractRector implements ConfigurableRectorI
             $this->changes[] = $change;
         }
     }
+
+    abstract protected function supportedKind(): string;
+
+    /** @return class-string<BCChange> */
+    abstract protected function configurationType(): string;
 
     private function refactorClass(Class_ $class): ?Class_
     {
@@ -502,7 +515,7 @@ final class BCChangeRector extends AbstractRector implements ConfigurableRectorI
         return false;
     }
 
-    private function matchesCurrentType(Identifier|Node\Name|Node\ComplexType|null $type, mixed $currentType): bool
+    private function matchesCurrentType(Identifier|Name|ComplexType|null $type, mixed $currentType): bool
     {
         if ($currentType === null) {
             return $type === null;

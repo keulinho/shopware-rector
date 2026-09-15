@@ -10,7 +10,6 @@ use Frosh\Rector\Migration\v67\Shopware67Migration;
 use Frosh\Rector\Migration\v68\CheckoutPermissionsMigration;
 use Frosh\Rector\Migration\v68\ProductStreamBuilderInterfaceMigration;
 use Frosh\Rector\Migration\v68\Shopware68Migration;
-use Frosh\Rector\Rule\BCChange\BCChangeRector;
 use Frosh\Rector\Rule\v67\AddEntityNameToEntityExtension;
 use Frosh\Rector\Rule\v67\AddLoggerToScheduledTaskConstructorRector;
 use Frosh\Rector\Rule\v68\CartBehaviorIsRecalculationRector;
@@ -49,11 +48,7 @@ final class ShopwareSet
         string $targetVersion,
     ): RectorConfigBuilder {
         $versions = new ShopwareVersionRange($minimumVersion, $targetVersion);
-        $bcChanges = BCChangeSet::forVersionRange($versions->minimum, $versions->target);
-
-        $rectorConfig
-            ->withConfiguredRule(BCChangeRector::class, $bcChanges)
-        ;
+        BCChangeSet::configure($rectorConfig, $versions->minimum, $versions->target);
 
         foreach (self::VERSION_AWARE_RECTORS as $versionAwareRector) {
             if (!$versionAwareRector::isActive($versions)) {

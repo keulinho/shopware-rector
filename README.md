@@ -53,18 +53,16 @@ Shopware's BC-change attributes are stored in a generated, historical manifest a
 the version-range set above. They can also be configured directly:
 
 ```php
-use Frosh\Rector\Rule\BCChange\BCChangeRector;
 use Frosh\Rector\Set\BCChangeSet;
 use Rector\Config\RectorConfig;
 
-return RectorConfig::configure()
-    ->withConfiguredRule(
-        BCChangeRector::class,
-        BCChangeSet::forVersionRange(
-            minimumVersion: '6.7.0',
-            targetVersion: '6.8.0',
-        ),
-    );
+$rectorConfig = RectorConfig::configure();
+
+return BCChangeSet::configure(
+    $rectorConfig,
+    minimumVersion: '6.7.0',
+    targetVersion: '6.8.0',
+);
 ```
 
 Changes newer than the target are ignored. Each transformation uses the actual version range:
@@ -78,8 +76,9 @@ composer dump-autoload --optimize
 ./bin/generate-bc-change-config.php [SHOPWARE]/vendor/autoload.php v6.8.0 config/bc-changes.php
 ```
 
-The generator replaces only entries for the requested version, preserving older changes for later
-runs after the minimum version is raised. It covers `NewOptionalParameter`, `NewRequiredParameter`,
+The generator emits typed configurations for separate Rector rules and replaces only entries for
+the requested version, preserving older changes for later runs after the minimum version is raised.
+It covers `NewOptionalParameter`, `NewRequiredParameter`,
 `ParameterDefaultValueChange`, `ParameterNameChange`, `ParameterRemoval`,
 `ParameterTypeWidening`, and `ReturnTypeNarrowing`. Other attributes remain diagnostics until their
 migration can be expressed without guessing application behavior.

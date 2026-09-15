@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Frosh\Rector\Tests\Rector\BCChange\TargetOnlyBCChangeRector;
+namespace Frosh\Rector\Tests\Rector\BCChange\BCChangeRectors;
 
 use Frosh\Rector\Tests\Rector\AbstractFroshRectorTestCase;
 use PHPUnit\Framework\Attributes\CoversNothing;
 
 /** @internal */
 #[CoversNothing]
-final class TargetOnlyBCChangeRectorTest extends AbstractFroshRectorTestCase {}
+final class BCChangeRectorsTest extends AbstractFroshRectorTestCase {}

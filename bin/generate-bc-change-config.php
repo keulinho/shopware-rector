@@ -4,6 +4,7 @@
 declare(strict_types=1);
 
 use Frosh\Rector\Generator\BCChangeConfigGenerator;
+use Frosh\Rector\Rule\BCChange\BCChangeConfiguration;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -59,12 +60,12 @@ $classes = array_keys(array_filter(
 ));
 
 $generator = new BCChangeConfigGenerator();
-$existingChanges = is_file($outputFile) ? require $outputFile : [];
-if (!is_array($existingChanges)) {
-    throw new RuntimeException(sprintf('Existing manifest "%s" must return an array.', $outputFile));
+$existingConfiguration = is_file($outputFile) ? require $outputFile : new BCChangeConfiguration([]);
+if (!$existingConfiguration instanceof BCChangeConfiguration) {
+    throw new RuntimeException(sprintf('Existing manifest "%s" must return a %s.', $outputFile, BCChangeConfiguration::class));
 }
 
-$changes = $generator->replaceVersion($existingChanges, $generator->collect($classes, $version), $version);
+$changes = $generator->replaceVersion($existingConfiguration->changes, $generator->collect($classes, $version), $version);
 $configuration = $generator->render($changes);
 
 if (file_put_contents($outputFile, $configuration) === false) {
