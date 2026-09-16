@@ -4,19 +4,12 @@ declare(strict_types=1);
 
 namespace Frosh\Rector\Set;
 
-use Frosh\Rector\Migration\v65\Shopware65Migration;
-use Frosh\Rector\Migration\v66\Shopware66Migration;
-use Frosh\Rector\Migration\v67\Shopware67Migration;
-use Frosh\Rector\Migration\v68\CheckoutPermissionsMigration;
-use Frosh\Rector\Migration\v68\ProductStreamBuilderInterfaceMigration;
-use Frosh\Rector\Migration\v68\Shopware68Migration;
 use Frosh\Rector\Rule\v67\AddEntityNameToEntityExtension;
 use Frosh\Rector\Rule\v67\AddLoggerToScheduledTaskConstructorRector;
 use Frosh\Rector\Rule\v68\CartBehaviorIsRecalculationRector;
 use Frosh\Rector\Rule\v68\EntitySearchResultGetEntitiesRector;
 use Frosh\Rector\Rule\v68\ProductStreamBuilderBuildFiltersToEnrichCriteriaRector;
 use Frosh\Rector\Version\ShopwareVersionRange;
-use Frosh\Rector\Version\VersionAwareMigrationInterface;
 use Frosh\Rector\Version\VersionAwareRectorInterface;
 use Rector\Configuration\RectorConfigBuilder;
 use Rector\Contract\Rector\ConfigurableRectorInterface;
@@ -27,19 +20,6 @@ final class ShopwareSet
     private const VERSION_AWARE_RECTORS = [
         AddEntityNameToEntityExtension::class,
         AddLoggerToScheduledTaskConstructorRector::class,
-        EntitySearchResultGetEntitiesRector::class,
-        CartBehaviorIsRecalculationRector::class,
-        ProductStreamBuilderBuildFiltersToEnrichCriteriaRector::class,
-    ];
-
-    /** @var list<class-string<VersionAwareMigrationInterface>> */
-    private const VERSION_AWARE_MIGRATIONS = [
-        Shopware65Migration::class,
-        Shopware66Migration::class,
-        Shopware67Migration::class,
-        Shopware68Migration::class,
-        CheckoutPermissionsMigration::class,
-        ProductStreamBuilderInterfaceMigration::class,
     ];
 
     public static function forVersionRange(
@@ -49,6 +29,39 @@ final class ShopwareSet
     ): RectorConfigBuilder {
         $versions = new ShopwareVersionRange($minimumVersion, $targetVersion);
         BCChangeSet::configure($rectorConfig, $versions->minimum, $versions->target);
+
+        $sets = [];
+        if ($versions->minimumIsAtLeast('6.5.0')) {
+            array_push(
+                $sets,
+                __DIR__ . '/../../config/v6.5/flysystem-v3.php',
+                __DIR__ . '/../../config/v6.5/renaming.php',
+                __DIR__ . '/../../config/v6.5/typehints.php',
+                __DIR__ . '/../../config/v6.5/rules.php',
+            );
+        }
+        if ($versions->minimumIsAtLeast('6.6.0')) {
+            $sets[] = __DIR__ . '/../../config/v6.6/renaming.php';
+            $sets[] = __DIR__ . '/../../config/v6.6/exceptions.php';
+        }
+        if ($versions->minimumIsAtLeast('6.7.0')) {
+            $sets[] = __DIR__ . '/../../config/v6.7/renaming.php';
+            $sets[] = __DIR__ . '/../../config/v6.7/return-types.php';
+        }
+        if ($versions->minimumIsAtLeast('6.8.0')) {
+            $sets[] = __DIR__ . '/../../config/v6.8/renaming.php';
+        }
+        if (EntitySearchResultGetEntitiesRector::isActive($versions)) {
+            $sets[] = __DIR__ . '/../../config/v6.8/entity-search-result.php';
+        }
+        if (CartBehaviorIsRecalculationRector::isActive($versions)) {
+            $sets[] = __DIR__ . '/../../config/v6.8/checkout-permissions.php';
+        }
+        if (ProductStreamBuilderBuildFiltersToEnrichCriteriaRector::isActive($versions)) {
+            $sets[] = __DIR__ . '/../../config/v6.8/product-stream.php';
+        }
+
+        $rectorConfig->withSets($sets);
 
         foreach (self::VERSION_AWARE_RECTORS as $versionAwareRector) {
             if (!$versionAwareRector::isActive($versions)) {
@@ -64,12 +77,6 @@ final class ShopwareSet
                 }
 
                 $rectorConfig->withConfiguredRule($versionAwareRector, $configuration);
-            }
-        }
-
-        foreach (self::VERSION_AWARE_MIGRATIONS as $versionAwareMigration) {
-            if ($versionAwareMigration::isActive($versions)) {
-                $versionAwareMigration::register($rectorConfig);
             }
         }
 

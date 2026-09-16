@@ -28,10 +28,11 @@ return ShopwareSet::forVersionRange(
 );
 ```
 
-Handwritten migrations declare the earliest supported minimum version for which they are safe and
-the target version that makes them relevant. Rules that can simplify code after the minimum is
-raised inspect the configured range directly. The existing `ShopwareSetList::SHOPWARE_6_X`
-constants remain available for their original one-version behavior.
+Handwritten Rectors declare the earliest supported minimum version for which they are safe and the
+target version that makes them relevant. The version-range entry point composes the existing sets
+directly, while rules that can simplify code after the minimum is raised inspect the configured
+range. The existing `ShopwareSetList::SHOPWARE_6_X` constants remain available for their original
+one-version behavior.
 
 ## Use directly the config
 
